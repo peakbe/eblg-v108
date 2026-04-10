@@ -19,6 +19,15 @@ document.addEventListener("DOMContentLoaded", () => {
     updateStatusPanel();
 });
 
+import { updateLogs } from "./logs.js";
+
+document.addEventListener("DOMContentLoaded", () => {
+    const map = initMap();
+    if (!map) return;
+
+    updateStatusPanel();  // déjà en place
+    updateLogs();         // nouveau
+});
 
 document.addEventListener("DOMContentLoaded", () => {
     console.log("[APP] Initialisation…");
