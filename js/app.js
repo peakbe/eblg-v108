@@ -12,6 +12,11 @@ import "./sonometers.js";
 import { updateStatusPanel } from "./status.js";
 import { updateLogs } from "./logs.js";
 import { startLiveLogs } from "./logsLive.js";
+import { toggleHeatmap } from "./sonometers.js";
+
+document.getElementById("toggle-heatmap").addEventListener("click", () => {
+    toggleHeatmap(window._map);
+});
 
 // ============================
 // INITIALISATION UNIQUE
@@ -26,9 +31,10 @@ document.addEventListener("DOMContentLoaded", () => {
         console.error("[APP ERROR] La carte n'a pas pu être initialisée.");
         return;
     }
+    window._map = map;
 
     console.log("[APP] Carte prête. Modules chargés.");
-
+    
     // Modules de monitoring
     updateStatusPanel();
     updateLogs();
