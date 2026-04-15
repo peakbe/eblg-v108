@@ -1,3 +1,22 @@
+import express from "express";
+import cors from "cors";
+import fetch from "node-fetch";
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// =========================
+// CORS PRO+
+// =========================
+app.use(cors({
+    origin: "*",
+    methods: ["GET"],
+    allowedHeaders: ["Content-Type"]
+}));
+
+// =========================
+// CACHE PRO+ (60 sec)
+// =========================
 const cache = {
     metar: { ts: 0, data: null },
     taf: { ts: 0, data: null },
@@ -17,22 +36,6 @@ function setCache(key, data) {
     cache[key].ts = Date.now();
     cache[key].data = data;
 }
-
-import express from "express";
-import cors from "cors";
-import fetch from "node-fetch";
-
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-// =========================
-// CORS PRO+
-// =========================
-app.use(cors({
-    origin: "*",
-    methods: ["GET"],
-    allowedHeaders: ["Content-Type"]
-}));
 
 // =========================
 // FETCH PRO+
@@ -68,21 +71,27 @@ async function safeFetch(url) {
 // METAR
 // =========================
 app.get("/metar", async (req, res) => {
+    const cached = getCache("metar");
+    if (cached) return res.json(cached);
+
     const data = await safeFetch(
         `https://api.checkwx.com/metar/EBLG/decoded?x-api-key=${process.env.CHECKWX_KEY}`
     );
 
     if (data.fallback) {
-        return res.json({
+        const fb = {
             fallback: true,
             data: [{
                 raw_text: "METAR unavailable",
                 wind: { degrees: 0, speed_kts: 0 }
             }],
             timestamp: new Date().toISOString()
-        });
+        };
+        setCache("metar", fb);
+        return res.json(fb);
     }
 
+    setCache("metar", data);
     res.json(data);
 });
 
@@ -90,36 +99,41 @@ app.get("/metar", async (req, res) => {
 // TAF (corrigé)
 // =========================
 app.get("/taf", async (req, res) => {
+    const cached = getCache("taf");
+    if (cached) return res.json(cached);
+
     const data = await safeFetch(
         `https://api.checkwx.com/taf/EBLG/decoded?x-api-key=${process.env.CHECKWX_KEY}`
     );
 
     if (data.fallback) {
-        return res.json({
+        const fb = {
             fallback: true,
             data: [{
                 raw_text: "TAF unavailable"
             }],
             timestamp: new Date().toISOString()
-        });
+        };
+        setCache("taf", fb);
+        return res.json(fb);
     }
 
+    setCache("taf", data);
     res.json(data);
 });
 
 // =========================
-// FIDS — AviationStack PRO+
+// FIDS (AviationStack)
 // =========================
 app.get("/fids", async (req, res) => {
     const cached = getCache("fids");
     if (cached) return res.json(cached);
 
-    const url = `http://api.aviationstack.com/v1/flights?dep_iata=LGG&limit=10&access_key=${process.env.AVIATIONSTACK_KEY}`;
+    const url = `http://api.aviationstack.com/v1/flights?dep_iata=LGG&access_key=${process.env.AVIATIONSTACK_KEY}`;
     const data = await safeFetch(url);
 
-    // Si l’API ne répond pas ou renvoie une erreur
     if (data.fallback || !data.data) {
-        const fallback = [{
+        const fb = [{
             flight: "N/A",
             destination: "N/A",
             time: "N/A",
@@ -127,13 +141,12 @@ app.get("/fids", async (req, res) => {
             fallback: true,
             timestamp: new Date().toISOString()
         }];
-        setCache("fids", fallback);
-        return res.json(fallback);
+        setCache("fids", fb);
+        return res.json(fb);
     }
 
-    // Transformation des données AviationStack → format dashboard
-    const flights = data.data.map(f => ({
-        flight: f.flight?.iata || f.flight?.number || "N/A",
+    const flights = data.data.slice(0, 10).map(f => ({
+        flight: f.flight?.iata || "N/A",
         destination: f.arrival?.iata || "N/A",
         time: f.departure?.scheduled || "N/A",
         status: f.flight_status || "N/A",
@@ -143,7 +156,6 @@ app.get("/fids", async (req, res) => {
     setCache("fids", flights);
     res.json(flights);
 });
-
 
 // =========================
 // START SERVER
