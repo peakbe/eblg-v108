@@ -68,6 +68,42 @@ async function safeFetch(url) {
 }
 
 // =========================
+// FIDS DYNAMIC GENERATOR
+// =========================
+function generateDynamicFids() {
+    const now = new Date();
+    const baseHour = now.getHours();
+    const pad = n => String(n).padStart(2, "0");
+
+    const flights = [
+        { flight: "QY123", destination: "LEJ" },
+        { flight: "X7182", destination: "TLV" },
+        { flight: "QR8962", destination: "DOH" },
+        { flight: "ET3721", destination: "ADD" },
+        { flight: "TK6543", destination: "IST" },
+        { flight: "3V450", destination: "CGN" },
+        { flight: "RU927", destination: "SVO" },
+        { flight: "K4972", destination: "CVG" }
+    ];
+
+    const statuses = ["Departed", "Boarding", "Loading", "Scheduled", "Delayed"];
+
+    return flights.map((f, i) => {
+        const hour = (baseHour + i) % 24;
+        const minute = (10 + i * 7) % 60;
+
+        return {
+            flight: f.flight,
+            destination: f.destination,
+            time: `${pad(hour)}:${pad(minute)}`,
+            status: statuses[i % statuses.length],
+            fallback: true,
+            timestamp: now.toISOString()
+        };
+    });
+}
+
+// =========================
 // METAR
 // =========================
 app.get("/metar", async (req, res) => {
@@ -96,7 +132,7 @@ app.get("/metar", async (req, res) => {
 });
 
 // =========================
-// TAF (corrigé)
+// TAF
 // =========================
 app.get("/taf", async (req, res) => {
     const cached = getCache("taf");
@@ -123,7 +159,7 @@ app.get("/taf", async (req, res) => {
 });
 
 // =========================
-// FIDS (AviationStack)
+// FIDS (AviationStack + Dynamic Fallback)
 // =========================
 app.get("/fids", async (req, res) => {
     const cached = getCache("fids");
@@ -132,28 +168,11 @@ app.get("/fids", async (req, res) => {
     const url = `http://api.aviationstack.com/v1/flights?dep_iata=LGG&access_key=${process.env.AVIATIONSTACK_KEY}`;
     const data = await safeFetch(url);
 
-   if (data.fallback || !data.data) {
-
-    const realisticFids = [
-        { flight: "QY123", destination: "LEJ", time: "08:45", status: "Departed", fallback: true },
-        { flight: "X7182", destination: "TLV", time: "09:10", status: "Boarding", fallback: true },
-        { flight: "QR8962", destination: "DOH", time: "09:40", status: "Scheduled", fallback: true },
-        { flight: "ET3721", destination: "ADD", time: "10:05", status: "Loading", fallback: true },
-        { flight: "TK6543", destination: "IST", time: "10:20", status: "Delayed", fallback: true },
-        { flight: "3V450", destination: "CGN", time: "10:45", status: "Departed", fallback: true },
-        { flight: "RU927", destination: "SVO", time: "11:00", status: "Scheduled", fallback: true },
-        { flight: "K4972", destination: "CVG", time: "11:20", status: "Loading", fallback: true }
-    ];
-
-    const fb = realisticFids.map(f => ({
-        ...f,
-        timestamp: new Date().toISOString()
-    }));
-
-    setCache("fids", fb);
-    return res.json(fb);
-}
-
+    if (data.fallback || !data.data) {
+        const fb = generateDynamicFids();
+        setCache("fids", fb);
+        return res.json(fb);
+    }
 
     const flights = data.data.slice(0, 10).map(f => ({
         flight: f.flight?.iata || "N/A",
@@ -168,7 +187,7 @@ app.get("/fids", async (req, res) => {
 });
 
 // =========================
-// SONOMETERS (restauré)
+// SONOMETERS
 // =========================
 app.get("/sonos", (req, res) => {
     res.json({ ok: true });
