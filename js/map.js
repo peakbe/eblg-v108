@@ -2,8 +2,6 @@
 // MAP MODULE PRO+
 // =========================
 
-import { initSonometers } from "./sonometers.js";
-
 let map = null;
 
 export function initMap() {
@@ -34,9 +32,6 @@ export function initMap() {
         // Layers piste active
         window.runwayLayer = L.layerGroup().addTo(map);
         window.corridorLayer = L.layerGroup().addTo(map);
-
-        // Modules
-        
 
         console.log("[MAP] Carte initialisée avec succès.");
         return map;
